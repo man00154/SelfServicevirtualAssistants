@@ -16,7 +16,7 @@ MODEL_NAME = "gemini-2.0-flash-lite"
 API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent"
 
 st.set_page_config(page_title="Virtual Assistant DC", layout="wide")
-st.title("Data Center Virtual Assistant — Self-Service AI")
+st.title("MANISH - Data Center Virtual Assistant — Self-Service AI")
 
 # ---------------- Simple RAG ----------------
 class TinyRAG:
