@@ -1,7 +1,7 @@
 # app.py
 import os
 import json
-from typing import List, Dict, Any
+from typing import List
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -42,16 +42,22 @@ class TinyRAG:
 
 # ---------------- Gemini call with fallback ----------------
 def generate_with_gemini(prompt: str) -> str:
-    key = os.environ.get("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY", None)
+    key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     if not key:
         st.warning("GEMINI_API_KEY not set. Using local fallback generator.")
         return local_plan_generator(prompt)
+
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key}"}
     body = {"prompt": {"text": prompt}, "temperature": 0.2, "maxOutputTokens": 800}
+
     try:
         r = requests.post(API_URL, headers=headers, json=body, timeout=20)
+        if r.status_code == 401:
+            st.error("Gemini API Key invalid or unauthorized! Using local fallback.")
+            return local_plan_generator(prompt)
         r.raise_for_status()
         resp = r.json()
+        # Parse response
         if "candidates" in resp and len(resp["candidates"]) > 0:
             return resp["candidates"][0].get("content","") or resp["candidates"][0].get("display","")
         if "output" in resp and isinstance(resp["output"], list):
@@ -59,14 +65,8 @@ def generate_with_gemini(prompt: str) -> str:
         if "text" in resp:
             return resp["text"]
         return json.dumps(resp, indent=2)[:4000]
-    except requests.exceptions.HTTPError as e:
-        if r.status_code == 401:
-            st.error("Gemini API Key invalid or unauthorized! Using local fallback.")
-        else:
-            st.error(f"Gemini API error ({r.status_code}): {e}. Using fallback.")
-        return local_plan_generator(prompt)
     except Exception as e:
-        st.warning(f"Gemini call failed: {e}. Using fallback.")
+        st.warning(f"Gemini call failed: {e}. Using local fallback.")
         return local_plan_generator(prompt)
 
 def local_plan_generator(prompt: str) -> str:
@@ -83,13 +83,13 @@ def local_plan_generator(prompt: str) -> str:
 
 # ---------------- LangGraph visualization ----------------
 def display_plan_graph(plan_text: str):
-    # Minimal dependency graph simulation
     G = nx.DiGraph()
     lines = [l.strip() for l in plan_text.split("\n") if l.strip()]
     for i, line in enumerate(lines):
-        G.add_node(f"Step {i+1}: {line[:30]}")  # truncate label
+        node_label = f"Step {i+1}: {line[:30]}"
+        G.add_node(node_label)
         if i > 0:
-            G.add_edge(f"Step {i}", f"Step {i+1}: {line[:30]}")
+            G.add_edge(f"Step {i}", node_label)
     plt.figure(figsize=(8,4))
     nx.draw(G, with_labels=True, node_color="skyblue", node_size=2500, arrows=True)
     st.pyplot(plt)
