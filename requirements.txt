@@ -1,8 +1,7 @@
 streamlit
-requests
 scikit-learn
-numpy
 pandas
+numpy
+requests
+matplotlib
 networkx
-pyvis
-python-dotenv
