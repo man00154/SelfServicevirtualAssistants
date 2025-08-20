@@ -47,24 +47,21 @@ def generate_with_gemini(prompt: str) -> str:
         st.warning("GEMINI_API_KEY not set. Using local fallback generator.")
         return local_plan_generator(prompt)
 
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key}"}
-    body = {"prompt": {"text": prompt}, "temperature": 0.2, "maxOutputTokens": 800}
+    headers = {"Content-Type": "application/json"}
+    body = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.2, "maxOutputTokens": 800}}
 
     try:
-        r = requests.post(API_URL, headers=headers, json=body, timeout=20)
+        r = requests.post(API_URL + f"?key={key}", headers=headers, json=body, timeout=20)
         if r.status_code == 401:
             st.error("Gemini API Key invalid or unauthorized! Using local fallback.")
             return local_plan_generator(prompt)
         r.raise_for_status()
         resp = r.json()
-        # Parse response
         if "candidates" in resp and len(resp["candidates"]) > 0:
-            return resp["candidates"][0].get("content","") or resp["candidates"][0].get("display","")
-        if "output" in resp and isinstance(resp["output"], list):
-            return " ".join([x.get("content","") if isinstance(x, dict) else str(x) for x in resp["output"]])
-        if "text" in resp:
-            return resp["text"]
-        return json.dumps(resp, indent=2)[:4000]
+            candidate = resp["candidates"][0]
+            if "content" in candidate and "parts" in candidate["content"] and len(candidate["content"]["parts"]) > 0:
+                return candidate["content"]["parts"][0].get("text", "")
+        return "No text content found in the response."
     except Exception as e:
         st.warning(f"Gemini call failed: {e}. Using local fallback.")
         return local_plan_generator(prompt)
